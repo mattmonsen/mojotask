@@ -1,0 +1,206 @@
+#!/usr/bin/env perl
+
+use Mojolicious::Lite;
+
+plugin 'config';
+my $config = app->config;
+
+plugin 'tt_renderer';
+plugin 'browser_detect';
+plugin 'database' => {
+    dsn      => $config->{'database'}->{'dsn'},
+    username => $config->{'database'}->{'username'},
+    password => $config->{'database'}->{'password'},
+    helper   => 'dbh',
+};
+plugin 'authentication' => {
+    session_key => 'mojotask',
+    stash_key   => 'auth',
+    load_user   => sub {
+        my $self = shift;
+        my $uid = shift;
+        my $sth = $self->dbh->prepare('SELECT * FROM user WHERE id = ?');
+        $sth->execute($uid);
+        if (my $res = $sth->fetchrow_hashref) {
+            return $res;
+        } else {
+            return undef;
+        }
+    },
+    validate_user => sub {
+        my $self = shift;
+        my $user = shift;
+        my $pass = shift;
+        my $sth = $self->dbh->prepare('SELECT * FROM user WHERE username = ?');
+        $sth->execute($user);
+        if (my $res = $sth->fetchrow_hashref) {
+            my $salt = substr($res->{'password'}, 0, 2);
+            return (crypt($pass, $salt) eq $res->{'password'})
+                ? $res->{'id'}
+                : undef;
+        } else {
+            return undef;
+        }
+    },
+};
+
+
+helper select => sub {
+    my $self = shift;
+    $self->dbh->selectall_arrayref('SELECT * FROM mojotask ORDER BY id', { Slice => {} });
+};
+
+helper insert => sub {
+    my $self = shift;
+    my $value = shift || return undef;
+    $self->dbh->do('INSERT INTO mojotask SET data = ?', {}, $value);
+    return 1;
+};
+
+helper delete => sub {
+    my $self = shift;
+    my $mojotask_id = shift;
+    $self->dbh->do('DELETE FROM mojotask WHERE id = ? LIMIT 1', {}, $mojotask_id);
+    return 1;
+};
+
+get '/login' => {} => 'login';
+post '/login' => sub {
+    my $self = shift;
+    my $user = $self->param('user');
+    my $pass = $self->param('pass');
+
+    if ($self->authenticate($user, $pass)) {
+        $self->session( user => $user );
+        return $self->redirect_to('/');
+    } else {
+        $self->stash( message => 'Invalid Credentials' );
+    }
+
+    
+} => 'login';
+
+under sub {
+    return 1 if $_[0]->session('user');
+    shift->redirect_to('/login') and return;
+};
+
+get '/' => sub {
+    my $self = shift;
+    if ($self->browser->mobile) {
+        return $self->redirect_to('/mobile');
+    }
+    $self->stash( 
+        hello => $config->{'foo'},
+        results => $self->select 
+    );
+    $self->render('index');
+};
+
+post '/insert' => sub {
+    my $self = shift;
+    $self->insert($self->param('value'));
+    $self->redirect_to('/');
+};
+
+post '/delete' => sub {
+    my $self = shift;
+    my $mojotask_ids = ref $self->param('mojotask_id') eq 'ARRAY' ? $self->param('mojotask_id') : [ $self->param('mojotask_id') ];
+    foreach my $id (@$mojotask_ids) {
+        $self->delete($id);
+    }
+    $self->redirect_to('/');
+};
+
+get '/logout' => sub {
+    $_[0]->session( expires => 1);
+    shift->redirect_to('/login') and return;
+};
+
+get '/mobile' => sub {
+    my $self = shift;
+    $self->stash(
+        hello => $config->{'foo'},
+        results => $self->select
+    );
+};
+
+app->start;
+
+__DATA__
+
+@@ index.html.tt
+<html>
+  <head>
+    <title>Mojotask</title>
+  </head>
+  <body>
+[% USE Dumper %]
+
+<form action="/insert" method="POST">
+Value <input type="text" name="value" />
+<input type="submit" value="submit" name="submit" />
+</form>
+<hr>
+<form action="/delete" method="POST">
+[%- FOREACH row IN results %]
+  <input type="checkbox" name="mojotask_id" value="[% row.id %]" />
+  [% row.id %]. [% row.data %]<br>
+[%- END %]
+<input type="submit" value="delete" name="delete" />
+</form>
+  </body>
+</html>
+
+@@ mobile.html.tt
+<!DOCTYPE html> 
+<html> 
+<head> 
+    <title>My Page</title> 
+    <meta name="viewport" content="width=device-width, initial-scale=1"> 
+    <link rel="stylesheet" href="http://code.jquery.com/mobile/1.2.1/jquery.mobile-1.2.1.min.css" />
+    <script src="http://code.jquery.com/jquery-1.8.3.min.js"></script>
+    <script src="http://code.jquery.com/mobile/1.2.1/jquery.mobile-1.2.1.min.js"></script>
+</head> 
+<body> 
+
+<div data-role="page">
+
+    <div data-role="header">
+        <h1>MojoTask</h1>
+    </div><!-- /header -->
+
+    <div data-role="content">   
+       [%- FOREACH row IN results %]
+           [% row.id %]. [% row.data %]<br>
+       [%- END %] 
+    </div><!-- /content -->
+
+</div><!-- /page -->
+
+</body>
+</html>
+
+@@ login.html.tt
+<table width="100%" cellspacing="0">
+<tr>
+<td width="50%">
+<h2>MojoTask - Simple Mojo Task List</h2>
+<form method="POST">
+    <p><label>Username:<br />
+    <input type="text" name="user" /></label></p>
+    <p><label>Password:<br />
+    <input type="password" name="pass" /></label></p>
+    <p><input type="submit" name="signin" value="Sign In" /></p>
+    <span style="color: red;">[% message %]</span>
+</form>
+</td>
+<td width="50%" valign="top">
+<h2>Create a New Account Now!</h2>
+<ul>
+<li><a href="/user/registration">User Registration</a></li>
+</ul>
+</td>
+</tr>
+</table>
+

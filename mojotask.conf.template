@@ -1,0 +1,7 @@
+{
+    database => {
+        dsn      => 'dbi:mysql:mojotask;host=localhost',
+        username => 'username',
+        password => 'password',
+    },
+}

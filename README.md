@@ -1,4 +1,4 @@
 mojotask
 ========
 
-A to-do list mangage written in Mojolicious::Lite
+A to-do list manager written in Mojolicious::Lite
