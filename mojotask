@@ -57,6 +57,20 @@ helper insert => sub {
     return 1;
 };
 
+helper update => sub {
+    my $self = shift;
+    my $args = shift;
+    return 1 unless $args->{'data'} && $args->{'id'};
+    $self->dbh->do('UPDATE mojotask SET data = ? WHERE id = ?', {}, $args->{'data'}, $args->{'id'});
+    return 1;
+};
+
+helper get_task => sub {
+    my $self = shift;
+    my $id = shift;
+    $self->dbh->selectall_arrayref('SELECT * FROM mojotask WHERE id = ?', { Slice => {} }, $id)->[0];
+};
+
 helper delete => sub {
     my $self = shift;
     my $mojotask_id = shift;
@@ -103,6 +117,18 @@ post '/insert' => sub {
     $self->redirect_to('/');
 };
 
+get '/update/(:id)' => sub {
+    my $self = shift;
+    my $task = $self->get_task($self->param('id'));
+    $self->stash( task => $task );
+    $self->render('update');
+};
+post '/update' => sub {
+    my $self = shift;
+    $self->update({ id => $self->param('id'), data => $self->param('data') });
+    $self->redirect_to('/');
+};
+
 post '/delete' => sub {
     my $self = shift;
     my $mojotask_ids = ref $self->param('mojotask_id') eq 'ARRAY' ? $self->param('mojotask_id') : [ $self->param('mojotask_id') ];
@@ -145,7 +171,7 @@ Value <input type="text" name="value" />
 <form action="/delete" method="POST">
 [%- FOREACH row IN results %]
   <input type="checkbox" name="mojotask_id" value="[% row.id %]" />
-  [% row.id %]. [% row.data %]<br>
+  [% row.id %]. [% row.data %] <a href="/update/[% row.id %]">edit</a><br>
 [%- END %]
 <input type="submit" value="delete" name="delete" />
 </form>
@@ -204,3 +230,16 @@ Value <input type="text" name="value" />
 </tr>
 </table>
 
+@@ update.html.tt
+<html>
+  <head>
+    <title>Update</title>
+  </head>
+  <body>
+  <form method="POST" action="/update">
+    <input type="hidden" name="id" value="[% task.id %]" />
+    <input type="text" name="data" value="[% task.data %]" />
+    <input type="submit" name="Update" value="update" />
+  </form>
+  </body>
+</html>
