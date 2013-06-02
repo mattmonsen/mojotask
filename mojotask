@@ -68,7 +68,7 @@ helper update => sub {
 helper get_task => sub {
     my $self = shift;
     my $id = shift;
-    $self->dbh->selectall_arrayref('SELECT * FROM mojotask WHERE id = ?', { Slice => {} }, $id)->[0];
+    $self->dbh->selectrow_hashref('SELECT * FROM mojotask WHERE id = ?', undef, $id);
 };
 
 helper delete => sub {
