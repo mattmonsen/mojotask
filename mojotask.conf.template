@@ -4,4 +4,24 @@
         username => 'username',
         password => 'password',
     },
+    status => {
+        1 => 'Opened',
+        2 => 'Waiting',
+        3 => 'Blocked',
+        4 => 'Closed'.
+    },
+    complex => {
+        1 => 'Very Easy'.
+        2 => 'Easy',
+        3 => 'Normal',
+        4 => 'Hard',
+        5 => 'Very Hard',
+    },
+    type => {
+        1 => 'Task',
+        2 => 'Feature',
+        3 => 'Bug',
+        4 => 'Improvement',
+        5 => 'Other',
+    },
 }
