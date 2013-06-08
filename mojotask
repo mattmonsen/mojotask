@@ -179,12 +179,22 @@ get '/create' => sub {
 get '/update/(:id)' => sub {
     my $self = shift;
     my $task = $self->get_task($self->param('id'));
-    $self->stash( task => $task );
+    $self->stash({
+         task         => $task,
+         type         => $config->{'type'},
+         task_status  => $config->{'status'},
+         complex      => $config->{'complex'},
+    });
     $self->render('update');
 };
 post '/update' => sub {
     my $self = shift;
-    $self->update({ id => $self->param('id'), data => $self->param('data') });
+    my $hash;
+    my $fields = $self->fields;
+    foreach my $field (@$fields) {
+        $hash->{$field} = $self->param($field) if $self->param($field);
+    }
+    $self->update($hash);
     $self->redirect_to('/');
 };
 
@@ -264,6 +274,7 @@ __DATA__
           <tr>
             <th>#</th>
             <th>Title</th>
+            <th>Type</th>
             <th>Status</th>
             <th>Complex</th>
             <th>Created</th>
@@ -273,6 +284,7 @@ __DATA__
           <tr>
             <td>[% row.id %]</td>
             <td>[% row.title %]
+            <td>[% row.type %]
             <td>[% row.status %]</td>
             <td>[% row.complex %]</td>
             <td>[% row.created %]</td>
@@ -308,27 +320,24 @@ __DATA__
 [% PROCESS footer.html %]
 
 @@ update.html.tt
-[% PROCESS header.html %]
-  <form method="POST" action="/update">
-    <input type="hidden" name="id" value="[% task.id %]" />
-    <input type="text" name="data" value="[% task.data %]" />
-    <input type="submit" name="Update" value="update" />
-  </form>
-[% PROCESS footer.html %]
+[% PROCESS "create.html.tt" action => 'update' %]
 
 @@ create.html.tt
 [% PROCESS header.html %]
-  <form method="POST" action="/insert" class="form-horizontal">
+  <form method="POST" action="/[% action || 'insert' %]" class="form-horizontal">
+    [%- IF action == 'update' %]
+    <input type="hidden" name="id" value="[% task.id %]">
+    [%- END %]
     <div class="control-group">
       <label class="control-label" for="title">Title</label>
       <div class="controls">
-        <input type="text" id="title" placeholder="Title" name="title" />
+        <input type="text" id="title" placeholder="Title" name="title" value="[% task.title %]" />
       </div>
     </div>
     <div class="control-group">
       <label class="control-label" for="description">Description</label>
       <div class="controls">
-        <input type="text" id="description" placeholder="Description" name="description"/>
+        <input type="text" id="description" placeholder="Description" name="description" value="[% task.description %]" />
       </div>
     </div>
     <div class="control-group">
@@ -336,7 +345,7 @@ __DATA__
       <div class="controls">
         <select id="status" name="status">
           [%- FOREACH status IN task_status %]
-          <option value="[% status %]">[% status %]</option>
+          <option value="[% status %]"[% IF status == task.status %] selected[% END %]>[% status %]</option>
           [%- END %]
         </select>
       </div>
@@ -346,7 +355,7 @@ __DATA__
       <div class="controls">
         <select id="type" name="type">
           [%- FOREACH t IN type %]
-          <option value="[% t %]">[% t %]</option>
+          <option value="[% t %]" [% IF t == task.type %] selected[% END %]>[% t %]</option>
           [%- END %]
         </select>
       </div>
@@ -356,7 +365,7 @@ __DATA__
       <div class="controls">
         <select id="complex" name="complex">
           [%- FOREACH c IN complex %]
-          <option value="[% c %]">[% c %]</option>
+          <option value="[% c %]"[% IF c == task.complex %] selected[% END %]>[% c %]</option>
           [%- END %]
         </select>
       </div>
@@ -364,12 +373,12 @@ __DATA__
     <div class="control-group">
       <label class="control-label" for="tags">Tags</label>
       <div class="controls">
-        <input type="text" id="tags" placeholder="Tags" name="tags"/>
+        <input type="text" id="tags" placeholder="Tags" name="tags" value="[% task.tags %]" />
       </div>
     </div>
     <div class="control-group">
       <div class="controls">
-        <button type="submit" class="btn">Create</button>
+        <button type="submit" class="btn">[% IF action == 'update' %]Update[% ELSE %]Create[% END %]</button>
       </div>
     </div>
   </form>
