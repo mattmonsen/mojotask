@@ -1,6 +1,7 @@
 #!/usr/bin/env perl
 
 use Mojolicious::Lite;
+use Data::Dumper;
 
 plugin 'config';
 my $config = app->config;
@@ -44,7 +45,6 @@ plugin 'authentication' => {
     },
 };
 
-
 helper select => sub {
     my $self = shift;
     $self->dbh->selectall_arrayref('SELECT * FROM mojotask ORDER BY id', { Slice => {} });
@@ -52,16 +52,33 @@ helper select => sub {
 
 helper insert => sub {
     my $self = shift;
-    my $value = shift || return undef;
-    $self->dbh->do('INSERT INTO mojotask SET data = ?', {}, $value);
+    my $args = shift || return undef;
+    my ($fields, $values) = $self->hash2mysql($args);
+    my $field_string = '(' . join(', ', @$fields) . ')';
+    my $value_string = '(' . join(', ', map({ '?' } @$fields)) . ')';
+    my $sql = qq{
+        INSERT INTO mojotask
+            $field_string
+        VALUES
+            $value_string
+    };
+    my $sth= $self->dbh->prepare($sql);
+    $sth->execute(@$values);
     return 1;
 };
 
 helper update => sub {
     my $self = shift;
-    my $args = shift;
-    return 1 unless $args->{'data'} && $args->{'id'};
-    $self->dbh->do('UPDATE mojotask SET data = ? WHERE id = ?', {}, $args->{'data'}, $args->{'id'});
+    my $args = shift || return undef;
+    my $id = delete $args->{'id'} || return undef;
+    my ($fields, $values) = $self->hash2mysql($args);
+    my $update_string = join(",\n", map { "$_ = ?" } @$fields);
+    my $sql = qq{
+        UPDATE mojotask
+           SET $update_string
+         WHERE id = ?
+    };
+    $self->dbh->do($sql, {}, @$values, $id);
     return 1;
 };
 
@@ -76,6 +93,33 @@ helper delete => sub {
     my $mojotask_id = shift;
     $self->dbh->do('DELETE FROM mojotask WHERE id = ? LIMIT 1', {}, $mojotask_id);
     return 1;
+};
+
+helper fields => sub {
+    my $self = shift;
+    return $self->session->{'fields'} ||= do {
+        my $fields;
+        my $sth = $self->dbh->prepare('DESC mojotask');
+        $sth->execute;
+        while (my $rec = $sth->fetchrow_hashref) {
+            push @$fields, $rec->{'Field'};
+        }
+        $fields; 
+    }
+};
+
+helper hash2mysql => sub {
+    my $self = shift;
+    my $hash = shift || {};
+    my (@fields, @values);
+    my $table_fields = $self->fields;
+    foreach my $field (sort @$table_fields) {
+        if (exists $hash->{ $field }) {
+            push @fields, "mojotask.$field";
+            push @values, $hash->{ $field };
+        }
+    }
+    return (\@fields, \@values);
 };
 
 get '/login' => {} => 'login';
@@ -113,8 +157,23 @@ get '/' => sub {
 
 post '/insert' => sub {
     my $self = shift;
-    $self->insert($self->param('value'));
+    my $hash;
+    my $fields = $self->fields;
+    foreach my $field (@$fields) {
+        $hash->{$field} = $self->param($field) if $self->param($field);
+    }
+    $self->insert($hash);
     $self->redirect_to('/');
+};
+
+get '/create' => sub {
+    my $self = shift;
+    $self->stash({
+        type         => $config->{'type'},
+        task_status  => $config->{'status'},
+        complex      => $config->{'complex'},
+    });
+    $self->render('create');
 };
 
 get '/update/(:id)' => sub {
@@ -184,6 +243,7 @@ __DATA__
           <div class="nav-collapse collapse">
             <ul class="nav">
               <li class="active"><a href="/">Home</a></li>
+              <li class="active"><a href="/create">Create</a></li>
             </ul>
           </div><!--/.nav-collapse -->
         </div>
@@ -200,19 +260,26 @@ __DATA__
 
 @@ index.html.tt
 [% PROCESS "header.html" title => "MojoTask" %]
-      <form action="/insert" method="POST" class="form-inline">
-          <input type="text" name="value" placeholder="Enter task..." />
-          <button  type="submit" class="btn">Submit</button>
-      </form>
-      <form action="/delete" method="POST">
-        [%- FOREACH row IN results %]
-        <label class="checkbox">
-          <input type="checkbox" name="mojotask_id" value="[% row.id %]" />
-        [% row.id %]. [% row.data %] <a href="/update/[% row.id %]">edit</a><br>
-        </label>
-        [%- END %]
-        <button type="submit" class="btn">Delete</button>
-      </form>
+        <table class="table table-striped">
+          <tr>
+            <th>#</th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Complex</th>
+            <th>Created</th>
+            <th>Function</th>
+          </tr>
+          [%- FOREACH row IN results %]
+          <tr>
+            <td>[% row.id %]</td>
+            <td>[% row.title %]
+            <td>[% row.status %]</td>
+            <td>[% row.complex %]</td>
+            <td>[% row.created %]</td>
+            <td> <a href="/update/[% row.id %]">Edit</a></td>
+          </tr>
+          [%- END %]
+        </table>
 [% PROCESS footer.html %]
 
 @@ login.html.tt
@@ -246,6 +313,65 @@ __DATA__
     <input type="hidden" name="id" value="[% task.id %]" />
     <input type="text" name="data" value="[% task.data %]" />
     <input type="submit" name="Update" value="update" />
+  </form>
+[% PROCESS footer.html %]
+
+@@ create.html.tt
+[% PROCESS header.html %]
+  <form method="POST" action="/insert" class="form-horizontal">
+    <div class="control-group">
+      <label class="control-label" for="title">Title</label>
+      <div class="controls">
+        <input type="text" id="title" placeholder="Title" name="title" />
+      </div>
+    </div>
+    <div class="control-group">
+      <label class="control-label" for="description">Description</label>
+      <div class="controls">
+        <input type="text" id="description" placeholder="Description" name="description"/>
+      </div>
+    </div>
+    <div class="control-group">
+      <label class="control-label" for="status">Status</label>
+      <div class="controls">
+        <select id="status" name="status">
+          [%- FOREACH status IN task_status %]
+          <option value="[% status %]">[% status %]</option>
+          [%- END %]
+        </select>
+      </div>
+    </div>
+    <div class="control-group">
+      <label class="control-label" for="type">Type</label>
+      <div class="controls">
+        <select id="type" name="type">
+          [%- FOREACH t IN type %]
+          <option value="[% t %]">[% t %]</option>
+          [%- END %]
+        </select>
+      </div>
+    </div>
+    <div class="control-group">
+      <label class="control-label" for="complex">Complex</label>
+      <div class="controls">
+        <select id="complex" name="complex">
+          [%- FOREACH c IN complex %]
+          <option value="[% c %]">[% c %]</option>
+          [%- END %]
+        </select>
+      </div>
+    </div>
+    <div class="control-group">
+      <label class="control-label" for="tags">Tags</label>
+      <div class="controls">
+        <input type="text" id="tags" placeholder="Tags" name="tags"/>
+      </div>
+    </div>
+    <div class="control-group">
+      <div class="controls">
+        <button type="submit" class="btn">Create</button>
+      </div>
+    </div>
   </form>
 [% PROCESS footer.html %]
 
