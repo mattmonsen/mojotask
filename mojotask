@@ -155,28 +155,99 @@ app->start;
 
 __DATA__
 
-@@ index.html.tt
-<html>
+@@ header.html
+<!DOCTYPE HTML>
+<html lang="en">
   <head>
-    <title>Mojotask</title>
+    <meta charset="utf-8">
+    <title>[% title || 'Mojotask' %]</title>
+    <link href="/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/bootstrap/css/bootstrap-responsive.min.css" rel="stylesheet">
+    <style type="text/css">
+      body {
+        padding-top: 60px;
+        padding-bottom: 40px;
+      }
+    </style> 
   </head>
+[%- USE Dumper %]
   <body>
-[% USE Dumper %]
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container">
+          <button type="button" class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="brand" href="/">MojoTask</a>
+          <div class="nav-collapse collapse">
+            <ul class="nav">
+              <li class="active"><a href="/">Home</a></li>
+            </ul>
+          </div><!--/.nav-collapse -->
+        </div>
+      </div>
+    </div> 
 
-<form action="/insert" method="POST">
-Value <input type="text" name="value" />
-<input type="submit" value="submit" name="submit" />
-</form>
-<hr>
-<form action="/delete" method="POST">
-[%- FOREACH row IN results %]
-  <input type="checkbox" name="mojotask_id" value="[% row.id %]" />
-  [% row.id %]. [% row.data %] <a href="/update/[% row.id %]">edit</a><br>
-[%- END %]
-<input type="submit" value="delete" name="delete" />
-</form>
+    <div class="container">
+
+@@ footer.html
+    </div>
+    <script src="/bootstrap/js/bootstrap.min.js"></script>
   </body>
 </html>
+
+@@ index.html.tt
+[% PROCESS "header.html" title => "MojoTask" %]
+      <form action="/insert" method="POST" class="form-inline">
+          <input type="text" name="value" placeholder="Enter task..." />
+          <button  type="submit" class="btn">Submit</button>
+      </form>
+      <form action="/delete" method="POST">
+        [%- FOREACH row IN results %]
+        <label class="checkbox">
+          <input type="checkbox" name="mojotask_id" value="[% row.id %]" />
+        [% row.id %]. [% row.data %] <a href="/update/[% row.id %]">edit</a><br>
+        </label>
+        [%- END %]
+        <button type="submit" class="btn">Delete</button>
+      </form>
+[% PROCESS footer.html %]
+
+@@ login.html.tt
+[% PROCESS header.html %]
+<table width="100%" cellspacing="0">
+<tr>
+<td width="50%">
+<h2>MojoTask - Simple Mojo Task List</h2>
+<form method="POST">
+    <p><label>Username:<br />
+    <input type="text" name="user" /></label></p>
+    <p><label>Password:<br />
+    <input type="password" name="pass" /></label></p>
+    <p><input type="submit" name="signin" value="Sign In" /></p>
+    <span style="color: red;">[% message %]</span>
+</form>
+</td>
+<td width="50%" valign="top">
+<h2>Create a New Account Now!</h2>
+<ul>
+<li><a href="/user/registration">User Registration</a></li>
+</ul>
+</td>
+</tr>
+</table>
+[% PROCESS footer.html %]
+
+@@ update.html.tt
+[% PROCESS header.html %]
+  <form method="POST" action="/update">
+    <input type="hidden" name="id" value="[% task.id %]" />
+    <input type="text" name="data" value="[% task.data %]" />
+    <input type="submit" name="Update" value="update" />
+  </form>
+[% PROCESS footer.html %]
 
 @@ mobile.html.tt
 <!DOCTYPE html> 
@@ -205,41 +276,4 @@ Value <input type="text" name="value" />
 </div><!-- /page -->
 
 </body>
-</html>
-
-@@ login.html.tt
-<table width="100%" cellspacing="0">
-<tr>
-<td width="50%">
-<h2>MojoTask - Simple Mojo Task List</h2>
-<form method="POST">
-    <p><label>Username:<br />
-    <input type="text" name="user" /></label></p>
-    <p><label>Password:<br />
-    <input type="password" name="pass" /></label></p>
-    <p><input type="submit" name="signin" value="Sign In" /></p>
-    <span style="color: red;">[% message %]</span>
-</form>
-</td>
-<td width="50%" valign="top">
-<h2>Create a New Account Now!</h2>
-<ul>
-<li><a href="/user/registration">User Registration</a></li>
-</ul>
-</td>
-</tr>
-</table>
-
-@@ update.html.tt
-<html>
-  <head>
-    <title>Update</title>
-  </head>
-  <body>
-  <form method="POST" action="/update">
-    <input type="hidden" name="id" value="[% task.id %]" />
-    <input type="text" name="data" value="[% task.data %]" />
-    <input type="submit" name="Update" value="update" />
-  </form>
-  </body>
 </html>
