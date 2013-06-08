@@ -299,7 +299,7 @@ __DATA__
 <table width="100%" cellspacing="0">
 <tr>
 <td width="50%">
-<h2>MojoTask - Simple Mojo Task List</h2>
+<h2>MojoTask - A simple task list</h2>
 <form method="POST">
     <p><label>Username:<br />
     <input type="text" name="user" /></label></p>
@@ -309,12 +309,12 @@ __DATA__
     <span style="color: red;">[% message %]</span>
 </form>
 </td>
-<td width="50%" valign="top">
+<!-- <td width="50%" valign="top">
 <h2>Create a New Account Now!</h2>
 <ul>
 <li><a href="/user/registration">User Registration</a></li>
 </ul>
-</td>
+</td> -->
 </tr>
 </table>
 [% PROCESS footer.html %]
