@@ -122,7 +122,15 @@ helper hash2mysql => sub {
     return (\@fields, \@values);
 };
 
-get '/login' => {} => 'login';
+get '/login' => sub {
+    my $self = shift;
+#    $self->log('test');
+    if ($self->browser->mobile) {
+        $self->render('mobile_login');
+    } else {
+        $self->render('login');
+    }
+};
 post '/login' => sub {
     my $self = shift;
     my $user = $self->param('user');
@@ -139,7 +147,11 @@ post '/login' => sub {
 } => 'login';
 
 under sub {
-    return 1 if $_[0]->session('user');
+    my $self = shift;
+    return 1 if $self->session('user');
+    if ($self->browser->mobile) {
+        return $self->redirect_to('/login');
+    }
     shift->redirect_to('/login') and return;
 };
 
@@ -383,18 +395,24 @@ __DATA__
   </form>
 [% PROCESS footer.html %]
 
-@@ mobile.html.tt
-<!DOCTYPE html> 
-<html> 
-<head> 
-    <title>MojoTask</title> 
-    <meta name="viewport" content="width=device-width, initial-scale=1"> 
+@@ mobile_header.html.tt
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MojoTask</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="http://code.jquery.com/mobile/1.2.1/jquery.mobile-1.2.1.min.css" />
     <script src="http://code.jquery.com/jquery-1.8.3.min.js"></script>
     <script src="http://code.jquery.com/mobile/1.2.1/jquery.mobile-1.2.1.min.js"></script>
-</head> 
-<body> 
+</head>
+<body>
 
+@@ mobile_footer.html.tt
+</body>
+</html>
+
+@@ mobile.html.tt
+[% PROCESS mobile_header.html.tt %]
 <div data-role="page">
 
     <div data-role="header">
@@ -408,6 +426,26 @@ __DATA__
     </div><!-- /content -->
 
 </div><!-- /page -->
+[% PROCESS mobile_footer.html.tt %]
 
-</body>
-</html>
+@@ mobile_login.html.tt
+[% PROCESS mobile_header.html.tt %]
+<div data-role="page">
+
+    <div data-role="header">
+        <h1>MojoTask</h1>
+    </div><!-- /header -->
+
+    <div data-role="content">
+<form method="POST">
+    <p><label>Username:<br />
+    <input type="text" name="user" /></label></p>
+    <p><label>Password:<br />
+    <input type="password" name="pass" /></label></p>
+    <p><input type="submit" name="signin" value="Sign In" /></p>
+    <span style="color: red;">[% message %]</span>
+</form>
+    </div><!-- /content -->
+
+</div><!-- /page -->
+[% PROCESS mobile_footer.html.tt %]
