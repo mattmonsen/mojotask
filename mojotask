@@ -215,7 +215,6 @@ get '/logout' => sub {
 get '/mobile' => sub {
     my $self = shift;
     $self->stash(
-        hello => $config->{'foo'},
         results => $self->select
     );
 };
@@ -388,7 +387,7 @@ __DATA__
 <!DOCTYPE html> 
 <html> 
 <head> 
-    <title>My Page</title> 
+    <title>MojoTask</title> 
     <meta name="viewport" content="width=device-width, initial-scale=1"> 
     <link rel="stylesheet" href="http://code.jquery.com/mobile/1.2.1/jquery.mobile-1.2.1.min.css" />
     <script src="http://code.jquery.com/jquery-1.8.3.min.js"></script>
@@ -404,7 +403,7 @@ __DATA__
 
     <div data-role="content">   
        [%- FOREACH row IN results %]
-           [% row.id %]. [% row.data %]<br>
+           [% row.id %]. [% row.title %]<br>
        [%- END %] 
     </div><!-- /content -->
 
