@@ -325,6 +325,7 @@ __DATA__
 [% PROCESS "header.html" title => "MojoTask" %]
         <div class="hero-unit">
           <h2>[% task.title %]</h2>
+          <h4 class="muted">[% task.tags %]</h2>
           <ul class="inline">
             <li>Created:</li>
             <li class="text-info"><small>[% task.created %]</small></li>
