@@ -92,6 +92,7 @@ helper delete => sub {
     my $self = shift;
     my $mojotask_id = shift;
     $self->dbh->do('DELETE FROM mojotask WHERE id = ? LIMIT 1', {}, $mojotask_id);
+    $self->app->log->debug("$mojotask_id was removed");
     return 1;
 };
 
@@ -124,7 +125,6 @@ helper hash2mysql => sub {
 
 get '/login' => sub {
     my $self = shift;
-#    $self->log('test');
     if ($self->browser->mobile) {
         $self->render('mobile_login');
     } else {
@@ -148,11 +148,12 @@ post '/login' => sub {
 
 under sub {
     my $self = shift;
+    #$self->app->log->debug($self->app->mode);
     return 1 if $self->session('user');
     if ($self->browser->mobile) {
         return $self->redirect_to('/login');
     }
-    shift->redirect_to('/login') and return;
+    $self->redirect_to('/login') and return;
 };
 
 get '/' => sub {
@@ -188,6 +189,18 @@ get '/create' => sub {
     $self->render('create');
 };
 
+get '/show/:id' => sub {
+    my $self = shift;
+    my $task = $self->get_task($self->param('id'));
+    $self->stash({
+        task         => $task,
+        type         => $config->{'type'},
+        task_status  => $config->{'status'},
+        complex      => $config->{'complex'},
+    });
+    $self->render('show');
+};
+
 get '/update/(:id)' => sub {
     my $self = shift;
     my $task = $self->get_task($self->param('id'));
@@ -210,7 +223,7 @@ post '/update' => sub {
     $self->redirect_to('/');
 };
 
-post '/delete' => sub {
+any [qw(GET POST)] => '/delete' => sub {
     my $self = shift;
     my $mojotask_ids = ref $self->param('mojotask_id') eq 'ARRAY' ? $self->param('mojotask_id') : [ $self->param('mojotask_id') ];
     foreach my $id (@$mojotask_ids) {
@@ -247,6 +260,9 @@ __DATA__
       body {
         padding-top: 60px;
         padding-bottom: 40px;
+      }
+      textarea {
+        width: 600px;
       }
     </style> 
   </head>
@@ -293,8 +309,8 @@ __DATA__
           </tr>
           [%- FOREACH row IN results %]
           <tr>
-            <td>[% row.id %]</td>
-            <td>[% row.title %]
+            <td>[% loop.count %]</td>
+            <td><a href="/show/[% row.id %]">[% row.title %]</a>
             <td>[% row.type %]
             <td>[% row.status %]</td>
             <td>[% row.complex %]</td>
@@ -303,6 +319,28 @@ __DATA__
           </tr>
           [%- END %]
         </table>
+[% PROCESS footer.html %]
+
+@@ show.html.tt
+[% PROCESS "header.html" title => "MojoTask" %]
+        <div class="hero-unit">
+          <h2>[% task.title %]</h2>
+          <ul class="inline">
+            <li>Created:</li>
+            <li class="text-info"><small>[% task.created %]</small></li>
+          </ul>
+          <ul class="inline">
+            <li>Status:</li>
+            <li class="text-info"><small>[% task.status %]</small></li>
+            <li>Type:</li>
+            <li class="text-info"><small>[% task.type %]</small></li>
+            <li>Complex:</li>
+            <li class="text-info"><small>[% task.complex %]</small></li>
+          </ul>
+          <label>Description</label>
+          <pre>[% task.description %]</pre>
+          <a href="/" class="btn btn-large btn-primary">Back</a>
+        </div>
 [% PROCESS footer.html %]
 
 @@ login.html.tt
@@ -348,7 +386,7 @@ __DATA__
     <div class="control-group">
       <label class="control-label" for="description">Description</label>
       <div class="controls">
-        <input type="text" id="description" placeholder="Description" name="description" value="[% task.description %]" />
+        <textarea id="description" placeholder="Description" name="description" rows="8">[% task.description %]</textarea>
       </div>
     </div>
     <div class="control-group">
