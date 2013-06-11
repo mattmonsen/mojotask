@@ -149,7 +149,10 @@ post '/login' => sub {
 under sub {
     my $self = shift;
     #$self->app->log->debug($self->app->mode);
-    return 1 if $self->session('user');
+    if ($self->session('user')) {
+        $self->stash(user => $self->session('user'));
+        return 1;
+    }
     if ($self->browser->mobile) {
         return $self->redirect_to('/login');
     }
@@ -232,7 +235,7 @@ any [qw(GET POST)] => '/delete' => sub {
     $self->redirect_to('/');
 };
 
-get '/logout' => sub {
+any [qw(GET POST)] => '/logout' => sub {
     $_[0]->session( expires => 1);
     shift->redirect_to('/login') and return;
 };
@@ -282,6 +285,16 @@ __DATA__
               <li class="active"><a href="/">Home</a></li>
               <li class="active"><a href="/create">Create</a></li>
             </ul>
+            <form class="navbar-form pull-right" action="/[% IF user %]logout[% ELSE %]login[% END %]" method="POST">
+            [%- IF ! user %]
+              <input type="span2" type="text" name="user" placeholder="Username" />
+              <input type="span2" type="password" name="pass" placeholder="Password" />
+              <button type="submit" class="btn">Login</button>
+            [%- ELSE %]
+              <button type="submit" class="btn">Logout ([% user %])</button>
+            [%- END %]
+            </form>
+            
           </div><!--/.nav-collapse -->
         </div>
       </div>
