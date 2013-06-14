@@ -8,7 +8,6 @@ my $config = app->config;
 
 plugin 'tt_renderer';
 plugin 'browser_detect';
-plugin 'DefaultHelpers';
 plugin 'database' => {
     dsn      => $config->{'database'}->{'dsn'},
     username => $config->{'database'}->{'username'},
