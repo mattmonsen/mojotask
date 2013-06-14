@@ -8,6 +8,7 @@ my $config = app->config;
 
 plugin 'tt_renderer';
 plugin 'browser_detect';
+plugin 'DefaultHelpers';
 plugin 'database' => {
     dsn      => $config->{'database'}->{'dsn'},
     username => $config->{'database'}->{'username'},
@@ -268,7 +269,6 @@ __DATA__
       }
     </style> 
   </head>
-[%- USE Dumper %]
   <body>
     <div class="navbar navbar-inverse navbar-fixed-top">
       <div class="navbar-inner">
@@ -281,8 +281,8 @@ __DATA__
           <a class="brand" href="/">MojoTask</a>
           <div class="nav-collapse collapse">
             <ul class="nav">
-              <li class="active"><a href="/">Home</a></li>
-              <li class=""><a href="/create">Create</a></li>
+              <li class="[% IF ! c.current_route %]active[% END %]"><a href="/">Home</a></li>
+              <li class="[% IF c.current_route == 'create' %]active [% END %]"><a href="/create">Create</a></li>
             </ul>
             <form class="navbar-form pull-right" action="/[% IF user %]logout[% ELSE %]login[% END %]" method="POST">
             [%- IF ! user %]
