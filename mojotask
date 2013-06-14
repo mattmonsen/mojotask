@@ -165,7 +165,6 @@ get '/' => sub {
         return $self->redirect_to('/mobile');
     }
     $self->stash( 
-        hello => $config->{'foo'},
         results => $self->select 
     );
     $self->render('index');
@@ -283,7 +282,7 @@ __DATA__
           <div class="nav-collapse collapse">
             <ul class="nav">
               <li class="active"><a href="/">Home</a></li>
-              <li class="active"><a href="/create">Create</a></li>
+              <li class=""><a href="/create">Create</a></li>
             </ul>
             <form class="navbar-form pull-right" action="/[% IF user %]logout[% ELSE %]login[% END %]" method="POST">
             [%- IF ! user %]
