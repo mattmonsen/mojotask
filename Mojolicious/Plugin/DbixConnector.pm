@@ -1,5 +1,12 @@
 package Mojolicious::Plugin::DbixConnector;
 
+=head
+
+Mojolicious::Plugin::DbixConnector - Created by vti original module can be found here:
+https://github.com/vti/mojox-common/blob/master/lib/Mojolicious/Plugin/DbixConnector.pm
+
+=cut
+
 use strict;
 use warnings;
 
