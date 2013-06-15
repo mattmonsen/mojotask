@@ -8,11 +8,10 @@ my $config = app->config;
 
 plugin 'tt_renderer';
 plugin 'browser_detect';
-plugin 'database' => {
+plugin 'DbixConnector' => {
     dsn      => $config->{'database'}->{'dsn'},
     username => $config->{'database'}->{'username'},
     password => $config->{'database'}->{'password'},
-    helper   => 'dbh',
 };
 plugin 'authentication' => {
     session_key => 'mojotask',
@@ -45,6 +44,7 @@ plugin 'authentication' => {
     },
 };
 
+helper dbh => sub { shift->app->conn->dbh };
 helper select => sub {
     my $self = shift;
     $self->dbh->selectall_arrayref('SELECT * FROM mojotask ORDER BY id', { Slice => {} });
