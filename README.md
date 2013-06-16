@@ -13,4 +13,14 @@ Edit mojotask.conf and update your database information
 
     vim mojotask.conf
 
-Setup the schema insdie the schema directory
+Setup the schema inside the schema directory
+
+To run the test cases you will need to copy the t/mojotask.conf.template file to t/mojotask.conf
+
+    cp t/mojotask.conf.template t/mojotask.conf
+
+Edit t/mojotask.conf and update your test database information
+
+    vim t/mojotask.conf
+
+Set up the schema for your development database using the schema inside the schema directory

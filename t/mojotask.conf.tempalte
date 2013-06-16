@@ -1,0 +1,27 @@
+{
+    database => {
+        dsn      => 'dbi:mysql:mojotask_test;host=localhost',
+        username => 'username',
+        password => 'password',
+    },
+    status => [
+        'Opened',
+        'Waiting',
+        'Blocked',
+        'Closed',
+    ],
+    complex => [
+        'Very Easy',
+        'Easy',
+        'Normal',
+        'Hard',
+        'Very Hard',
+    ],
+    type => [
+        'Task',
+        'Feature',
+        'Bug',
+        'Improvement',
+        'Other',
+    ],
+}
