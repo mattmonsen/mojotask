@@ -55,7 +55,7 @@ helper my_tasks => sub {
     my $self = shift;
     my $user = $self->session('user') || return [];
     my $sql = q{
-        SELECT * 
+        SELECT m.*
           FROM mojotask m 
           JOIN user u ON u.id = m.assigned 
          WHERE u.username = ? 
@@ -194,8 +194,7 @@ get '/' => sub {
     $self->stash( 
         results => $self->select 
     );
-    $self->render('index');
-};
+} => 'index';
 
 post '/insert' => sub {
     my $self = shift;
@@ -223,7 +222,7 @@ get '/tasks' => sub {
     $self->stash({
         results => $self->my_tasks,
     });
-};
+} => 'tasks';
 
 get '/show/:id' => sub {
     my $self = shift;
@@ -431,7 +430,7 @@ __DATA__
             <td>[% row.status %]</td>
             <td>[% row.complex %]</td>
             <td>[% row.created %]</td>
-            <td> <a href="/update/[% row.id %]">Edit</a></td>
+            <td><i class="icon-edit"></i> <a href="/update/[% row.id %]">Edit</a></td>
           </tr>
           [%- END %]
         </table>
