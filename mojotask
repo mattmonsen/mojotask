@@ -67,11 +67,12 @@ helper my_tasks => sub {
 helper insert => sub {
     my $self = shift;
     my $args = shift || return undef;
-    my ($fields, $values) = $self->hash2mysql($args);
+    my $table = delete $args->{'table'} || 'mojotask';
+    my ($fields, $values) = $self->hash2mysql($args, $table);
     my $field_string = '(' . join(', ', @$fields) . ')';
     my $value_string = '(' . join(', ', map({ '?' } @$fields)) . ')';
     my $sql = qq{
-        INSERT INTO mojotask
+        INSERT INTO $table
             $field_string
         VALUES
             $value_string
@@ -84,11 +85,12 @@ helper insert => sub {
 helper update => sub {
     my $self = shift;
     my $args = shift || return undef;
+    my $table = delete $args->{'table'} || 'mojotask';
     my $id = delete $args->{'id'} || return undef;
-    my ($fields, $values) = $self->hash2mysql($args);
+    my ($fields, $values) = $self->hash2mysql($args, $table);
     my $update_string = join(",\n", map { "$_ = ?" } @$fields);
     my $sql = qq{
-        UPDATE mojotask
+        UPDATE $table
            SET $update_string
          WHERE id = ?
     };
@@ -112,10 +114,12 @@ helper delete => sub {
 
 helper fields => sub {
     my $self = shift;
-    return $self->session->{'fields'} ||= do {
+    my $table = shift || 'mojotask';
+    my $key = "fields:$table";
+    return $self->session->{$key} ||= do {
         my $fields;
-        my $sth = $self->dbh->prepare('DESC mojotask');
-        $sth->execute;
+        my $sth = $self->dbh->prepare("DESC $table");
+        $sth->execute();
         while (my $rec = $sth->fetchrow_hashref) {
             push @$fields, $rec->{'Field'};
         }
@@ -126,15 +130,24 @@ helper fields => sub {
 helper hash2mysql => sub {
     my $self = shift;
     my $hash = shift || {};
+    my $table = shift || 'mojotask';
     my (@fields, @values);
-    my $table_fields = $self->fields;
+    my $table_fields = $self->fields($table);
     foreach my $field (sort @$table_fields) {
         if (exists $hash->{ $field }) {
-            push @fields, "mojotask.$field";
+            push @fields, "$table.$field";
             push @values, $hash->{ $field };
         }
     }
     return (\@fields, \@values);
+};
+
+helper encrypt => sub {
+    my $self = shift;
+    my $pass = shift;
+    my @letters = ('A' .. 'Z', 'a' .. 'z', '0' .. '9', '/', '.');
+    my $salt = $letters[rand @letters] . $letters[rand @letters];
+    return crypt($pass, $salt);
 };
 
 get '/login' => sub {
@@ -224,6 +237,26 @@ get '/show/:id' => sub {
     $self->render('show');
 };
 
+get '/settings' => 'settings';
+post '/settings' => sub {
+    my $self = shift;
+    my $current = $self->param('current');
+    if ($self->authenticate($self->session('user'), $current)) {
+        my $new_pass = $self->param('new');
+        my $dup_pass = $self->param('dup');
+        if ($new_pass eq $dup_pass) {
+            my $encrypt = $self->encrypt($new_pass);
+            $self->update({ table => 'user', password => $encrypt, id => $self->current_user->{'id'} });
+            $self->flash(message => 'Password updated successfully!');
+        } else {
+            $self->flash(error => 'New password did not match!');
+        }
+    } else {
+        $self->flash(error => 'Password did not match current password!');
+    }
+    $self->redirect_to('/settings');
+};
+
 get '/update/(:id)' => sub {
     my $self = shift;
     my $task = $self->get_task($self->param('id'));
@@ -301,9 +334,10 @@ __DATA__
           <a class="brand" href="/">MojoTask</a>
           <div class="nav-collapse collapse">
             <ul class="nav">
-              <li class="[% IF ! c.current_route %]active[% END %]"><a href="/">Home</a></li>
-              <li class="[% IF c.current_route == 'create' %]active[% END %]"><a href="/create">Create</a></li>
-              <li class="[% IF c.current_route == 'tasks' %]active[% END %]"><a href="/tasks">My Tasks</a></li>
+              <li class="[% IF ! c.current_route %]active[% END %]"><a href="/"><i class="icon-home"></i> Home</a></li>
+              <li class="[% IF c.current_route == 'create' %]active[% END %]"><a href="/create"><i class="icon-plus-sign"></i> Create</a></li>
+              <li class="[% IF c.current_route == 'tasks' %]active[% END %]"><a href="/tasks"><i class="icon-user"></i> My Tasks</a></li>
+              <li class="[% IF c.current_route == 'settings' %]active[% END %]"><a href="/settings"><i class="icon-off"></i> Settings</a></li>
             </ul>
             <form class="navbar-form pull-right" action="/[% IF user %]logout[% ELSE %]login[% END %]" method="POST">
             [%- IF ! user %]
@@ -348,7 +382,7 @@ __DATA__
             <td>[% row.status %]</td>
             <td>[% row.complex %]</td>
             <td>[% row.created %]</td>
-            <td> <a href="/update/[% row.id %]">Edit</a></td>
+            <td><i class="icon-edit"></i> <a href="/update/[% row.id %]">Edit</a></td>
           </tr>
           [%- END %]
         </table>
@@ -401,6 +435,42 @@ __DATA__
           </tr>
           [%- END %]
         </table>
+[% PROCESS footer.html %]
+
+@@ settings.html.tt
+[% PROCESS "header.html" title => "MojoTask" %]
+        <h3>Change Password</h3>
+        [%- IF c.session.flash.message %]
+        <p class="text-success">[% c.session.flash.message %]</p>
+        [%- END %]
+        [%- IF c.session.flash.error %]
+        <p class="text-error">[% c.session.flash.error %]</p>
+        [%- END %]
+        <form method="POST" action="/settings" class="form-horizontal">
+          <div class="control-group">
+            <label class="control-label" for="new">Current Password:</label>
+            <div class="controls">
+              <input type="password" id="current" placeholder="Current" name="current" />
+            </div>
+          </div>  
+          <div class="control-group">
+            <label class="control-label" for="new">New Password:</label>
+            <div class="controls">
+              <input type="password" id="new" placeholder="New" name="new" />
+            </div>
+          </div>  
+          <div class="control-group">
+            <label class="control-label" for="dup">Confirm New Password:</label>
+            <div class="controls">
+              <input type="password" id="dup" placeholder="Confirm" name="dup" />
+            </div>
+          </div>  
+          <div class="control-group">
+            <div class="controls">
+              <button type="submit" class="btn btn-large btn-primary">Update</button>
+            </div>
+          </div>
+        </form>
 [% PROCESS footer.html %]
 
 @@ login.html.tt
@@ -487,7 +557,7 @@ __DATA__
     </div>
     <div class="control-group">
       <div class="controls">
-        <button type="submit" class="btn">[% IF action == 'update' %]Update[% ELSE %]Create[% END %]</button>
+        <button type="submit" class="btn btn-large btn-primary">[% IF action == 'update' %]Update[% ELSE %]Create[% END %]</button>
       </div>
     </div>
   </form>
