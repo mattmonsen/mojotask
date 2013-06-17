@@ -47,7 +47,21 @@ plugin 'authentication' => {
 helper dbh => sub { shift->app->conn->dbh };
 helper select => sub {
     my $self = shift;
-    $self->dbh->selectall_arrayref('SELECT * FROM mojotask ORDER BY id', { Slice => {} });
+    my $status = shift || 'Opened';
+    $self->dbh->selectall_arrayref("SELECT * FROM mojotask WHERE status = ? ORDER BY id", { Slice => {} }, $status);
+};
+
+helper my_tasks => sub {
+    my $self = shift;
+    my $user = $self->session('user') || return [];
+    my $sql = q{
+        SELECT * 
+          FROM mojotask m 
+          JOIN user u ON u.id = m.assigned 
+         WHERE u.username = ? 
+      ORDER BY m.id
+    };
+    $self->dbh->selectall_arrayref($sql, { Slice => {} }, $user);
 };
 
 helper insert => sub {
@@ -191,6 +205,13 @@ get '/create' => sub {
     $self->render('create');
 };
 
+get '/tasks' => sub {
+    my $self = shift;
+    $self->stash({
+        results => $self->my_tasks,
+    });
+};
+
 get '/show/:id' => sub {
     my $self = shift;
     my $task = $self->get_task($self->param('id'));
@@ -282,6 +303,7 @@ __DATA__
             <ul class="nav">
               <li class="[% IF ! c.current_route %]active[% END %]"><a href="/">Home</a></li>
               <li class="[% IF c.current_route == 'create' %]active[% END %]"><a href="/create">Create</a></li>
+              <li class="[% IF c.current_route == 'tasks' %]active[% END %]"><a href="/tasks">My Tasks</a></li>
             </ul>
             <form class="navbar-form pull-right" action="/[% IF user %]logout[% ELSE %]login[% END %]" method="POST">
             [%- IF ! user %]
@@ -353,6 +375,32 @@ __DATA__
           <pre>[% task.description %]</pre>
           <a href="/" class="btn btn-large btn-primary">Back</a>
         </div>
+[% PROCESS footer.html %]
+
+@@ tasks.html.tt 
+[% PROCESS "header.html" title => "MojoTask" %]
+        <table class="table table-striped">
+          <tr>
+            <th>#</th>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Complex</th>
+            <th>Created</th>
+            <th>Function</th>
+          </tr>
+          [%- FOREACH row IN results %]
+          <tr>
+            <td>[% loop.count %]</td>
+            <td><a href="/show/[% row.id %]">[% row.title %]</a>
+            <td>[% row.type %]
+            <td>[% row.status %]</td>
+            <td>[% row.complex %]</td>
+            <td>[% row.created %]</td>
+            <td> <a href="/update/[% row.id %]">Edit</a></td>
+          </tr>
+          [%- END %]
+        </table>
 [% PROCESS footer.html %]
 
 @@ login.html.tt
