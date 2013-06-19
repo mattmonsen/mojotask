@@ -70,11 +70,23 @@ helper my_lists => sub {
     my $sql = q{
         SELECT * 
           FROM list_type lt
-          JOIN mojotask_list ml ON ml.list_id = lt.id
-          JOIN mojotask m ON m.id = ml.mojotask_id
          WHERE user_id = ?
     };
     $self->dbh->selectall_arrayref($sql, { Slice => {} }, $user_id);
+};
+
+helper get_list => sub {
+    my $self = shift;
+    my $id = shift;
+    $self->dbh->selectrow_hashref('SELECT * FROM list_type WHERE id = ?', undef, $id);
+};
+
+helper create_list => sub {
+    my $self = shift;
+    my $name = shift || return undef;
+    my $user_id = $self->current_user->{'id'} || return [];
+    $self->insert({ user_id => $user_id, name => $name, table => 'list_type'});
+    return 1;
 };
 
 helper insert => sub {
@@ -91,7 +103,7 @@ helper insert => sub {
             $value_string
     };
     my $sth= $self->dbh->prepare($sql);
-    $sth->execute(@$values);
+    $sth->execute(@$values) || die $@;
     return 1;
 };
 
@@ -119,9 +131,10 @@ helper get_task => sub {
 
 helper delete => sub {
     my $self = shift;
-    my $mojotask_id = shift;
-    $self->dbh->do('DELETE FROM mojotask WHERE id = ? LIMIT 1', {}, $mojotask_id);
-    $self->app->log->debug("$mojotask_id was removed");
+    my $id = shift;
+    my $table = shift || 'mojotask';
+    $self->dbh->do("DELETE FROM $table WHERE id = ? LIMIT 1", {}, $id);
+    $self->app->log->debug("$id was removed from $table");
     return 1;
 };
 
@@ -243,6 +256,35 @@ get '/lists' => sub {
         lists => $self->my_lists,
     });
 } => 'lists';
+
+post '/lists/create' => sub {
+    my $self = shift;
+    my $name = $self->param('name');
+    $self->create_list($name);
+    $self->redirect_to('/lists');
+};
+
+get '/lists/edit/:id' => sub {
+    my $self = shift;
+    $self->stash({
+        list => $self->get_list($self->param('id')),
+    });
+} => 'lists_edit';
+
+post '/lists/edit' => sub {
+    my $self = shift;
+    my $id = $self->param('id');
+    my $name = $self->param('name');
+    $self->update({ id => $id, name => $name, table => 'list_type' });
+    $self->redirect_to('/lists');
+};
+
+get '/lists/delete/:id' => sub {
+    my $self = shift;
+    my $id = $self->param('id');
+    $self->delete($id, 'list_type');
+    $self->redirect_to('/lists');
+};
 
 get '/show/:id' => sub {
     my $self = shift;
@@ -427,7 +469,7 @@ __DATA__
           </ul>
           <label>Description</label>
           <pre>[% task.description %]</pre>
-          <a href="/" class="btn btn-large btn-primary">Back</a>
+          <a href="/" class="btn btn-small btn-primary">Back</a>
         </div>
 [% PROCESS footer.html %]
 
@@ -459,7 +501,40 @@ __DATA__
 
 @@ lists.html.tt
 [% PROCESS "header.html" title => "MojoTask" %]
-[% c.dumper(lists) %]
+<form method="POST" action="/lists/create" class="form-inline">
+    <input type="text" name="name" placeholder="New List" />
+    <button type="submit" class="btn btn btn-primary">New List</button>
+    <span style="color: red;">[% message %]</span>
+</form>
+<div style="width:550px">
+  <table class="table table-condensed">
+    <tr>
+      <th>Name</th>
+      <th>Created</th>
+      <th>Functions</th>
+    </tr>
+  [%- FOREACH list IN lists %]
+    <tr>
+      <td>[% list.name %]</td>
+      <td>[% list.created %]</td>
+      <td>
+        <a href="/lists/edit/[% list.id %]"><i class="icon-edit"></i></a>
+        <a href="/lists/delete/[% list.id %]"><i class="icon-trash"></i></a>
+      </td>
+    </tr>
+  [% END %]
+  </table>
+</div>
+[% PROCESS footer.html %]
+
+@@ lists_edit.html.tt
+[% PROCESS "header.html" title => "MojoTask" %]
+<form method="POST" action="/lists/edit" class="form-inline">
+    <input type="hidden" name="id" value="[% list.id %]" />
+    <input type="text" name="name" placeholder="New List" value="[% list.name %]" />
+    <button type="submit" class="btn btn-small btn-primary">Update</button>
+    <span style="color: red;">[% message %]</span>
+</form>
 [% PROCESS footer.html %]
 
 @@ settings.html.tt
@@ -492,7 +567,7 @@ __DATA__
           </div>  
           <div class="control-group">
             <div class="controls">
-              <button type="submit" class="btn btn-large btn-primary">Update</button>
+              <button type="submit" class="btn btn-small btn-primary">Update</button>
             </div>
           </div>
         </form>
@@ -582,7 +657,7 @@ __DATA__
     </div>
     <div class="control-group">
       <div class="controls">
-        <button type="submit" class="btn btn-large btn-primary">[% IF action == 'update' %]Update[% ELSE %]Create[% END %]</button>
+        <button type="submit" class="btn btn-small btn-primary">[% IF action == 'update' %]Update[% ELSE %]Create[% END %]</button>
       </div>
     </div>
   </form>
