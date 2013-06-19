@@ -64,6 +64,19 @@ helper my_tasks => sub {
     $self->dbh->selectall_arrayref($sql, { Slice => {} }, $user);
 };
 
+helper my_lists => sub {
+    my $self = shift;
+    my $user_id = $self->current_user->{'id'} || return [];
+    my $sql = q{
+        SELECT * 
+          FROM list_type lt
+          JOIN mojotask_list ml ON ml.list_id = lt.id
+          JOIN mojotask m ON m.id = ml.mojotask_id
+         WHERE user_id = ?
+    };
+    $self->dbh->selectall_arrayref($sql, { Slice => {} }, $user_id);
+};
+
 helper insert => sub {
     my $self = shift;
     my $args = shift || return undef;
@@ -224,6 +237,13 @@ get '/tasks' => sub {
     });
 } => 'tasks';
 
+get '/lists' => sub {
+    my $self = shift;
+    $self->stash({
+        lists => $self->my_lists,
+    });
+} => 'lists';
+
 get '/show/:id' => sub {
     my $self = shift;
     my $task = $self->get_task($self->param('id'));
@@ -336,6 +356,7 @@ __DATA__
               <li class="[% IF ! c.current_route %]active[% END %]"><a href="/"><i class="icon-home"></i> Home</a></li>
               <li class="[% IF c.current_route == 'create' %]active[% END %]"><a href="/create"><i class="icon-plus-sign"></i> Create</a></li>
               <li class="[% IF c.current_route == 'tasks' %]active[% END %]"><a href="/tasks"><i class="icon-user"></i> My Tasks</a></li>
+              <li class="[% IF c.current_route == 'lists' %]active[% END %]"><a href="/lists"><i class="icon-list"></i> My Lists</a></li>
               <li class="[% IF c.current_route == 'settings' %]active[% END %]"><a href="/settings"><i class="icon-off"></i> Settings</a></li>
             </ul>
             <form class="navbar-form pull-right" action="/[% IF user %]logout[% ELSE %]login[% END %]" method="POST">
@@ -434,6 +455,11 @@ __DATA__
           </tr>
           [%- END %]
         </table>
+[% PROCESS footer.html %]
+
+@@ lists.html.tt
+[% PROCESS "header.html" title => "MojoTask" %]
+[% c.dumper(lists) %]
 [% PROCESS footer.html %]
 
 @@ settings.html.tt
