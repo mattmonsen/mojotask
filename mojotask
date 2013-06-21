@@ -75,6 +75,18 @@ helper my_lists => sub {
     $self->dbh->selectall_arrayref($sql, { Slice => {} }, $user_id);
 };
 
+helper add_to_list => sub {
+    my $self = shift;
+    my $args = shift || {};
+    my $update = $args->{'mojotask_id'} ? 1 : 0;
+    my $insert_field = $update ? '?' : 'LAST_INSERT_ID()';
+    my $sql = qq{ INSERT INTO mojotask_list (mojotask_id, list_id) VALUES ($insert_field, ?)};
+    my @binds;
+    push @binds, $args->{'mojotask_id'} if $update;
+    push @binds, $args->{'list_id'};
+    $self->dbh->do($sql, undef, @binds); 
+};
+
 helper get_list => sub {
     my $self = shift;
     my $id = shift;
@@ -126,7 +138,13 @@ helper update => sub {
 helper get_task => sub {
     my $self = shift;
     my $id = shift;
-    $self->dbh->selectrow_hashref('SELECT * FROM mojotask WHERE id = ?', undef, $id);
+    $self->dbh->selectrow_hashref(q{
+        SELECT m.*, lt.name AS list_name, ml.list_id 
+          FROM mojotask m
+     LEFT JOIN mojotask_list ml ON ml.mojotask_id = m.id
+     LEFT JOIN list_type lt ON lt.id = ml.list_id
+         WHERE m.id = ?
+    }, undef, $id);
 };
 
 helper delete => sub {
@@ -230,6 +248,11 @@ post '/insert' => sub {
         $hash->{$field} = $self->param($field) if $self->param($field);
     }
     $self->insert($hash);
+    if ($self->param('list')) {
+        $self->add_to_list({ 
+            list_id     => $self->param('list'),
+        });
+    }
     $self->redirect_to('/');
 };
 
@@ -239,6 +262,7 @@ get '/create' => sub {
         type         => $config->{'type'},
         task_status  => $config->{'status'},
         complex      => $config->{'complex'},
+        lists        => $self->my_lists,
     });
     $self->render('create');
 };
@@ -326,6 +350,7 @@ get '/update/(:id)' => sub {
          type         => $config->{'type'},
          task_status  => $config->{'status'},
          complex      => $config->{'complex'},
+         lists        => $self->my_lists,
     });
     $self->render('update');
 };
@@ -337,6 +362,12 @@ post '/update' => sub {
         $hash->{$field} = $self->param($field) if $self->param($field);
     }
     $self->update($hash);
+    if ($self->param('list')) {
+        $self->add_to_list({ 
+            list_id     => $self->param('list'),
+            mojotask_id => $self->param('id')
+        });
+    }
     $self->redirect_to('/');
 };
 
@@ -466,6 +497,10 @@ __DATA__
             <li class="text-info"><small>[% task.type %]</small></li>
             <li>Complex:</li>
             <li class="text-info"><small>[% task.complex %]</small></li>
+            [%- IF task.list_name %]
+            <li>List:</li>
+            <li class="text-info"><small>[% task.list_name %]</small></li>
+            [%- END %]
           </ul>
           <label>Description</label>
           <pre>[% task.description %]</pre>
@@ -643,12 +678,24 @@ __DATA__
       <label class="control-label" for="complex">Complex</label>
       <div class="controls">
         <select id="complex" name="complex">
-          [%- FOREACH c IN complex %]
-          <option value="[% c %]"[% IF c == task.complex %] selected[% END %]>[% c %]</option>
+          [%- FOREACH com IN complex %]
+          <option value="[% com %]"[% IF com == task.complex %] selected[% END %]>[% com %]</option>
           [%- END %]
         </select>
       </div>
     </div>
+    [%- IF lists.0 %]
+    <div class="control-group">
+      <label class="control-label" for="list">List</label>
+      <div class="controls">
+        <select id="list" name="list">
+          [%- FOREACH l IN lists %]
+          <option value="[% l.id %]"[% IF l.id == task.list_id %] selected[% END %]>[% l.name %]</option>
+          [%- END %]
+        </select>
+      </div>
+    </div>
+    [%- END %]
     <div class="control-group">
       <label class="control-label" for="tags">Tags</label>
       <div class="controls">
