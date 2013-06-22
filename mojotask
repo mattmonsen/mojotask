@@ -55,9 +55,11 @@ helper my_tasks => sub {
     my $self = shift;
     my $user = $self->session('user') || return [];
     my $sql = q{
-        SELECT m.*
+        SELECT m.*, lt.name AS list_name, ml.list_id
           FROM mojotask m 
           JOIN user u ON u.id = m.assigned 
+     LEFT JOIN mojotask_list ml ON ml.mojotask_id = m.id
+          LEFT JOIN list_type lt ON lt.id = ml.list_id
          WHERE u.username = ? 
       ORDER BY m.id
     };
@@ -269,8 +271,11 @@ get '/create' => sub {
 
 get '/tasks' => sub {
     my $self = shift;
+    my $tasks = $self->my_tasks;
+    my $results;
+    push @{ $results->{$_->{'list_name'} || 'Uncategorized'} }, $_ for @$tasks;
     $self->stash({
-        results => $self->my_tasks,
+        results => $results,
     });
 } => 'tasks';
 
@@ -510,6 +515,8 @@ __DATA__
 
 @@ tasks.html.tt 
 [% PROCESS "header.html" title => "MojoTask" %]
+  [%- FOREACH list IN results.keys.sort %]
+        <h3>[% list %]</h3>
         <table class="table table-striped">
           <tr>
             <th>#</th>
@@ -520,7 +527,7 @@ __DATA__
             <th>Created</th>
             <th>Function</th>
           </tr>
-          [%- FOREACH row IN results %]
+          [%- FOREACH row IN results.$list %]
           <tr>
             <td>[% loop.count %]</td>
             <td><a href="/show/[% row.id %]">[% row.title %]</a>
@@ -532,6 +539,7 @@ __DATA__
           </tr>
           [%- END %]
         </table>
+  [%- END %]
 [% PROCESS footer.html %]
 
 @@ lists.html.tt
