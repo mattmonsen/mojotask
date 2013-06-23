@@ -82,7 +82,14 @@ helper add_to_list => sub {
     my $args = shift || {};
     my $update = $args->{'mojotask_id'} ? 1 : 0;
     my $insert_field = $update ? '?' : 'LAST_INSERT_ID()';
-    my $sql = qq{ INSERT INTO mojotask_list (mojotask_id, list_id) VALUES ($insert_field, ?)};
+    my $sql = qq{ 
+        INSERT INTO mojotask_list 
+            (mojotask_id, list_id) 
+        VALUES 
+            ($insert_field, ?)
+        ON DUPLICATE KEY UPDATE
+            list_id = VALUES(list_id)
+    };
     my @binds;
     push @binds, $args->{'mojotask_id'} if $update;
     push @binds, $args->{'list_id'};
